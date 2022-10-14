@@ -2,6 +2,8 @@ package dynuModels;
 
 import java.net.InetAddress;
 
+import dynuUpdater.DomainAddress;
+
 public class DNSRootRecordUpdate {
 	private String name;
 	private String group;
@@ -39,6 +41,13 @@ public class DNSRootRecordUpdate {
 		return rv;
 	}
 	*/
+	public void setIpv4Address(DomainAddress ipv4Address) {
+		if ( ipv4Address ==  null )
+			setIpv4Address((InetAddress)null);
+		else
+			setIpv4Address(ipv4Address.getAddress());
+	}
+
 	public void setIpv4Address(InetAddress ipv4Address) {
 		if ( ipv4Address ==  null )
 			ipv4 = false;
@@ -58,6 +67,13 @@ public class DNSRootRecordUpdate {
 		return rv;
 	}
 	*/
+	public void setIpv6Address(DomainAddress ipv6Address) {
+		if ( ipv6Address ==  null )
+			setIpv6Address((InetAddress)null);
+		else
+			setIpv6Address(ipv6Address.getAddress());
+	}
+
 	public void setIpv6Address(InetAddress ipv6Address) {
 		if ( ipv6Address ==  null )
 			ipv6 = false;

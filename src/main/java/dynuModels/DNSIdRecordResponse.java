@@ -3,6 +3,8 @@ package dynuModels;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import dynuUpdater.DNSRecordTypeEnum;
+
 public class DNSIdRecordResponse {
 	private Integer statusCode;
 	private ArrayList<DNSIdRecord> dnsRecords;

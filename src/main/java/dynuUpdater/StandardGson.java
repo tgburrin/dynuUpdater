@@ -16,8 +16,6 @@ import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 
-import dynuModels.DNSRecordTypeEnum;
-
 public class StandardGson {
 	public static Gson getGson (Boolean fieldUnderscores) {
 		JsonDeserializer<Instant> instDes = new JsonDeserializer<Instant>() {

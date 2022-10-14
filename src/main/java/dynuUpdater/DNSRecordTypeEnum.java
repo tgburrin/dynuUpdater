@@ -1,4 +1,4 @@
-package dynuModels;
+package dynuUpdater;
 
 public enum DNSRecordTypeEnum {
 	UNKNOWN("UNKNOWN"),

@@ -3,6 +3,8 @@ package dynuModels;
 import java.net.InetAddress;
 import java.time.Instant;
 
+import dynuUpdater.DNSRecordTypeEnum;
+
 public class DNSIdRecord {
 	private Long id;
 	private Long domainId;

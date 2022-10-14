@@ -2,6 +2,8 @@ package dynuModels;
 
 import java.net.InetAddress;
 
+import dynuUpdater.DNSRecordTypeEnum;
+
 public class DNSRecordUpdate {
 	private transient Long id;
 	private Boolean state;
