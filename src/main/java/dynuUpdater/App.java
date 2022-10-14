@@ -18,7 +18,7 @@ import java.util.logging.Logger;
 import com.google.gson.Gson;
 
 public class App {
-	private static Logger logger = Logger.getLogger(App.class.getName());
+	private static Logger logger;
 	private static boolean enableIPv4 = false;
 	private static boolean enableIPv6 = false;
 
@@ -61,6 +61,11 @@ public class App {
                 .getResourceAsStream("logging.properties");
         LogManager.getLogManager().readConfiguration(stream);
 
+        logger = Logger.getLogger(App.class.getName());
+        logger.log(Level.INFO, "Class "+App.class.getName());
+        logger.log(Level.FINE, "Debug level 1 enabled");
+        logger.log(Level.FINER, "Debug level 2 enabled");
+        logger.log(Level.FINEST, "Debug level 3 enabled");
         Long pid = ProcessHandle.current().pid();
 		BufferedReader br = new BufferedReader(new FileReader(args[0]));
 		Gson gb = StandardGson.getGson(true);

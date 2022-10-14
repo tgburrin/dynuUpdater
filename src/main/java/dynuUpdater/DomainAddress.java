@@ -25,6 +25,10 @@ public class DomainAddress {
 		return type;
 	}
 
+    public boolean equals(DomainAddress arg) {
+        return address.equals(arg.address) && type.equals(arg.type);
+    }
+
 	@Override
 	public String toString() {
 		return "DomainAddress [address=" + address.getHostAddress() + ", type=" + type + "]";

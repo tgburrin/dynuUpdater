@@ -1,8 +1,11 @@
 package dynuModels;
 
+import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 
 import dynuUpdater.DNSRecordTypeEnum;
+import dynuUpdater.DomainAddress;
 
 public class DNSRecordUpdate {
 	private transient Long id;
@@ -12,19 +15,28 @@ public class DNSRecordUpdate {
 	private InetAddress ipv4Address;
 	private InetAddress ipv6Address;
 
-	public DNSRecordUpdate ( String domainName, String nodeName, InetAddress addr) throws Exception {
+	public DNSRecordUpdate ( String domainName, String nodeName, InetAddress addr) {
 		this.nodeName = nodeName;
 		this.state = true;
 
-		if ( addr.getAddress().length == 4 ) {
+		if ( addr instanceof Inet4Address ) {
 			recordType = DNSRecordTypeEnum.IPV4;
 			ipv4Address = addr;
-		} else if ( addr.getAddress().length ==  16 ) {
+		} else if ( addr instanceof Inet6Address ) {
 			recordType = DNSRecordTypeEnum.IPV6;
 			ipv6Address = addr;
-		} else {
-			throw new Exception("Unhandled address type with length "+addr.getAddress().length);
 		}
+	}
+
+	public DNSRecordUpdate ( String domainName, String nodeName, DomainAddress addr) {
+		this.nodeName = nodeName;
+		this.state = true;
+
+		recordType = addr.getType();
+		if ( recordType == DNSRecordTypeEnum.IPV4 )
+			ipv4Address = addr.getAddress();
+		else if ( recordType == DNSRecordTypeEnum.IPV6 )
+			ipv6Address = addr.getAddress();
 	}
 
 	public Long getId() {

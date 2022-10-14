@@ -1,7 +1,6 @@
 package dynuUpdater;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpClient.Version;
@@ -11,6 +10,7 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -63,6 +63,9 @@ public class DynuClient {
 				.header("API-Key", accessToken)
 				.GET()
 				.build();
+
+		logger.log(Level.FINER, "Getting root id record for name "+hostname);
+
 		HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
 		if ( response.statusCode() == 200 ) {
 			rv = jsonParser.fromJson(response.body(), DNSIdRecord.class);
@@ -83,6 +86,8 @@ public class DynuClient {
 				.header("API-Key", accessToken)
 				.GET()
 				.build();
+
+		logger.log(Level.FINER, "Getting root record for id "+domainId);
 
 		HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
 		if ( response.statusCode() == 200 ) {
@@ -106,6 +111,8 @@ public class DynuClient {
 				.POST(BodyPublishers.ofString(jsonParser.toJson(rootUpdate)))
 				.build();
 
+		logger.log(Level.FINER, "Sending update to root domain "+jsonParser.toJson(rootUpdate));
+
 		HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
 		if ( response.statusCode() == 200 ) {
 			rv = jsonParser.fromJson(response.body(), DNSRootRecordResponse.class);
@@ -118,35 +125,19 @@ public class DynuClient {
 		return rv;
 	}
 
-	private DNSIdRecordResponse getDNSRececordsForId(Long domainId) throws IOException, InterruptedException {
-		DNSIdRecordResponse rv = null;
-		HttpRequest request = HttpRequest
-				.newBuilder()
-				.uri(URI.create(serviceUrl+"/dns/"+domainId+"/record"))
-				.header("Content-Type", "application/json")
-				.header("API-Key", accessToken)
-				.GET()
-				.build();
-
-		HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
-		if ( response.statusCode() == 200 ) {
-			rv = jsonParser.fromJson(response.body(), DNSIdRecordResponse.class);
-		}
-		return rv;
-	}
-
-	public DynuDomainNodeName getDNSRecordsForNode(DynuDomainName domain, String nodeName) throws DynuClientException, IOException, InterruptedException {
+	public HashMap<Long,DomainAddress> getDNSRecordsForNode(DynuDomainName domain, String nodeName) throws DynuClientException, IOException, InterruptedException {
 		if ( domain.getDomainId() == null )
 			throw new DynuClientException("Invalid domain record passed with "+domain);
 
 		return getDNSRecordsForNode(domain.getDomainId(), nodeName);
 	}
 
-	public DynuDomainNodeName getDNSRecordsForNode(Long domainId, String nodeName) throws DynuClientException, IOException, InterruptedException {
+	public HashMap<Long,DomainAddress> getDNSRecordsForNode(Long domainId, String nodeName) throws DynuClientException, IOException, InterruptedException {
 		if ( domainId == null )
 			throw new DynuClientException("Invalid domain id passed");
 
-		DynuDomainNodeName rv = null;
+		HashMap<Long,DomainAddress> rv = new HashMap<Long,DomainAddress>();
+
 		HttpRequest request = HttpRequest
 				.newBuilder()
 				.uri(URI.create(serviceUrl+"/dns/"+domainId+"/record"))
@@ -156,20 +147,18 @@ public class DynuClient {
 				.build();
 
 		HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
+
+		//logger.log(Level.FINEST, response.statusCode()+": "+response.body());
+
 		if ( response.statusCode() == 200 ) {
 			DNSIdRecordResponse recs = jsonParser.fromJson(response.body(), DNSIdRecordResponse.class);
 			for(DNSIdRecord rec : recs.getDnsRecords()) {
-				if ( rv == null ) {
-					rv = new DynuDomainNodeName(rec.getDomainName(), nodeName);
-					rv.setDomainId(domainId);
-				}
-				InetAddress addr = null;
 				if ( rec.getRecordType() == DNSRecordTypeEnum.IPV4 ) {
-					rv.setIpv4Address(new DomainAddress(rec.getIpv4Address()));
-					rv.setIpv4RecordId(rec.getId());
-				} else if ( rec.getRecordType() == DNSRecordTypeEnum.IPV6) {
-					rv.setIpv6Address(new DomainAddress(rec.getIpv6Address()));
-					rv.setIpv6RecordId(rec.getId());
+					logger.log(Level.FINEST, "Existing record "+rec.getId()+ " "+rec.getIpv4Address().getHostAddress());
+					rv.put(rec.getId(), new DomainAddress(rec.getIpv4Address()));
+				} else if ( rec.getRecordType() == DNSRecordTypeEnum.IPV6 ) {
+					logger.log(Level.FINEST, "Existing record "+rec.getId()+ " "+rec.getIpv6Address().getHostAddress());
+					rv.put(rec.getId(), new DomainAddress(rec.getIpv6Address()));
 				}
 			}
 		} else if( Arrays.asList(500, 501, 502).contains(response.statusCode()) ) {
@@ -180,35 +169,21 @@ public class DynuClient {
 		return rv;
 	}
 
-	private ArrayList<DNSIdRecord> getExistingNameRecords (Long domainId) throws IOException, InterruptedException {
-		ArrayList<DNSIdRecord> aRecords = new ArrayList<DNSIdRecord>();
-		DNSIdRecordResponse records = getDNSRececordsForId(domainId);
-		for(DNSIdRecord rec : records.getDnsRecords())
-			if ( Arrays.asList(DNSRecordTypeEnum.IPV4, DNSRecordTypeEnum.IPV6).contains(rec.getRecordType()) )
-				aRecords.add(rec);
-		return aRecords;
-	}
-
-	private Boolean removeNameRecords(ArrayList<DNSIdRecord> removeList) throws IOException, InterruptedException {
-		Boolean rv = true;
-		for(DNSIdRecord rec : removeList) {
-			String reqUrl = serviceUrl+"/dns/"+rec.getDomainId()+"/record/"+rec.getId();
-			HttpRequest request = HttpRequest
-					.newBuilder()
-					.uri(URI.create(reqUrl))
-					.header("Content-Type", "application/json")
-					.header("API-Key", accessToken)
-					.DELETE()
-					.build();
-			HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
-			// catch only error responses
-			if( Arrays.asList(401, 500, 502).contains(response.statusCode()) ) {
-				rv = false;
-				DynuException exception = jsonParser.fromJson(response.body(), DynuException.class);
-				logger.log(Level.WARNING, exception.toString());
-			}
+	private void removeNameRecord(Long domainId, Long recordId) throws IOException, InterruptedException, DynuClientException {
+		String reqUrl = serviceUrl+"/dns/"+domainId+"/record/"+recordId;
+		HttpRequest request = HttpRequest
+				.newBuilder()
+				.uri(URI.create(reqUrl))
+				.header("Content-Type", "application/json")
+				.header("API-Key", accessToken)
+				.DELETE()
+				.build();
+		HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
+		// catch only error responses
+		if( Arrays.asList(401, 500, 502).contains(response.statusCode()) ) {
+			DynuException exception = jsonParser.fromJson(response.body(), DynuException.class);
+			throw new DynuClientException(exception);
 		}
-		return rv;
 	}
 
 	private DNSIdRecord maintainDNSRecordForId(Long domainId, DNSRecordUpdate update) throws IOException, InterruptedException, DynuClientException {
@@ -224,7 +199,12 @@ public class DynuClient {
 				.POST(BodyPublishers.ofString(jsonParser.toJson(update)))
 				.build();
 
+		logger.log(Level.FINER, "Updating domain record with "+jsonParser.toJson(update));
+
 		HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
+
+		logger.log(Level.FINEST, response.statusCode()+": "+response.body());
+
 		if ( response.statusCode() == 200 ) {
 			rv = jsonParser.fromJson(response.body(), DNSIdRecord.class);
 		} else if( Arrays.asList(401, 500, 502).contains(response.statusCode()) ) {
@@ -233,6 +213,69 @@ public class DynuClient {
 			throw new DynuClientException(exception);
 		}
 
+		return rv;
+	}
+
+	private static Long locateDomainAddressId(HashMap<Long,DomainAddress> daList, DomainAddress da) {
+		logger.log(Level.FINEST, "Locating existing id for "+da);
+		for(Long id : daList.keySet()) {
+			if ( daList.get(id).getType() == da.getType() )
+				logger.log(Level.FINEST, "Comparing "+da+" => "+daList.get(id)+"("+id+")");
+
+			if ( daList.get(id).getType() == da.getType() && daList.get(id).equals(da) )
+				return id;
+		}
+		return null;
+	}
+
+	private Long reconcileDNSRecords(DynuDomainNodeName dn, Long currentId, DomainAddress currentAddress, HashMap<Long,DomainAddress> eRec) throws IOException, InterruptedException, DynuClientException {
+		Long rv = null;
+		DNSRecordUpdate update = new DNSRecordUpdate(dn.getDomainName(), dn.getNodeName(), currentAddress);
+		update.setId(currentId);
+
+		if ( currentId == null ) {
+			for(Long id : eRec.keySet()) {
+				DomainAddress da = eRec.get(id);
+				if ( da.getType() == currentAddress.getType() )
+					removeNameRecord(dn.getDomainId(), id);
+			}
+			logger.log(Level.FINER, "Adding address "+currentAddress.getAddress().getHostAddress());
+			DNSIdRecord resp = maintainDNSRecordForId(dn.getDomainId(), update);
+			rv = resp.getId();
+
+		} else {
+			logger.log(Level.FINER, "Current active id is "+currentId);
+			boolean found = false;
+			for(Long id : eRec.keySet()) {
+				DomainAddress da = eRec.get(id);
+				if ( da.getType() == currentAddress.getType() ) {
+					if ( da.getAddress() == null ) {
+						logger.log(Level.FINER, "Removing broken address for id "+id);
+						removeNameRecord(dn.getDomainId(), id);
+					} else if ( id.equals(currentId) ) {
+						found = true;
+						rv = currentId;
+						if ( !da.equals(currentAddress) ) {
+							logger.log(Level.FINER, "Updating "+id+" "+da.getAddress().getHostAddress()+" -> "+currentAddress.getAddress().getHostAddress());
+							maintainDNSRecordForId(dn.getDomainId(), update);
+						} else {
+							logger.log(Level.FINER, "No update required for id "+id+" "+da.getAddress().getHostAddress());
+						}
+					} else if ( !id.equals(currentId) ) {
+						logger.log(Level.FINER, "Removing additional id "+id+" "+da.getAddress().getHostAddress());
+						removeNameRecord(dn.getDomainId(), id);
+					}
+				}
+			}
+			if ( !found ) {
+				logger.log(Level.FINER, "Sending update for id "+currentId+" "+currentAddress.getAddress().getHostAddress());
+				DNSIdRecord resp = maintainDNSRecordForId(dn.getDomainId(), update);
+				rv = resp.getId();
+			} else {
+				logger.log(Level.INFO, "No update required for "+currentAddress.getAddress().getHostAddress());
+			}
+
+		}
 		return rv;
 	}
 
@@ -251,10 +294,53 @@ public class DynuClient {
 				return;
 			}
 		}
+
+
 		try {
-			DynuDomainNodeName existing = getDNSRecordsForNode(dn, dn.getNodeName());
-			System.out.println(dn);
-			System.out.println(existing);
+			HashMap<Long,DomainAddress> eRec = getDNSRecordsForNode(dn, dn.getNodeName());
+
+			// IPv4
+			if ( dn.getIpv4Address() != null ) {
+				if ( dn.getIpv4RecordId() == null )
+					dn.setIpv4RecordId(locateDomainAddressId(eRec, dn.getIpv4Address()));
+
+				Long recId = reconcileDNSRecords(
+						dn,
+						dn.getIpv4RecordId(),
+						dn.getIpv4Address(),
+						eRec);
+
+				dn.setIpv4RecordId(recId);
+			} else {
+				for(Long id : eRec.keySet()) {
+					DomainAddress da = eRec.get(id);
+					if ( da.getType() == DNSRecordTypeEnum.IPV4 ) {
+						removeNameRecord(dn.getDomainId(), id);
+						logger.log(Level.FINE, "Removing "+da.getAddress().getHostAddress());
+					}
+				}
+			}
+
+			// IPv6
+			if ( dn.getIpv6Address() != null ) {
+				if ( dn.getIpv6RecordId() == null )
+					dn.setIpv6RecordId(locateDomainAddressId(eRec, dn.getIpv6Address()));
+				Long recId = reconcileDNSRecords(
+						dn,
+						dn.getIpv6RecordId(),
+						dn.getIpv6Address(),
+						eRec);
+
+				dn.setIpv6RecordId(recId);
+			} else {
+				for(Long id : eRec.keySet()) {
+					DomainAddress da = eRec.get(id);
+					if ( da.getType() == DNSRecordTypeEnum.IPV6 ) {
+						logger.log(Level.FINE, "Removing "+da.getAddress().getHostAddress());
+						removeNameRecord(dn.getDomainId(), id);
+					}
+				}
+			}
 		} catch ( InterruptedException | DynuClientException | IOException e) {
 			logger.log(Level.WARNING, "Exception:\n"+e.getMessage()+"\n"+getExceptionStack(e));
 		}
@@ -262,34 +348,47 @@ public class DynuClient {
 
 	private void maintainDynDomainName(DynuDomainName dn) {
 		try {
-			DNSIdRecord eRec = getRootIdRecordByName(dn.getDomainName());
-			DNSRootRecordUpdate update = new DNSRootRecordUpdate(dn.getDomainName());
+			if ( dn.getDomainId() == null ) {
+				DNSIdRecord idRec = getRootIdRecordByName(dn.getDomainName());
+				dn.setDomainId(idRec.getId());
+			}
 
-			if ( dn.getDomainId() == null )
-				dn.setDomainId(eRec.getDomainId());
+			DNSRootRecordResponse eRec = getDNSRootRecord(dn.getDomainId());
+			logger.log(Level.FINEST, eRec.toString());
+			DNSRootRecordUpdate update = new DNSRootRecordUpdate(dn.getDomainName());
+			update.setIpv4Address(dn.getIpv4Address());
+			update.setIpv6Address(dn.getIpv6Address());
 
 			Boolean sendUpdate = false;
-			if ( eRec.getIpv4Address() == null && dn.getIpv4Address() != null ||
-					eRec.getIpv4Address() != null && dn.getIpv4Address() == null ) {
-				// A new address is being set
+			// IPv4
+			if ( eRec.getIpv4Address() == null && dn.getIpv4Address() != null ) {
+				logger.log(Level.FINE, "A new ipv4 address is being set "+dn.getIpv4Address().getAddress().getHostAddress());
 				sendUpdate = true;
-				update.setIpv4Address(dn.getIpv4Address());
-			} else if ( dn.getIpv4Address() != null && !dn.getIpv4Address().getAddress().equals(eRec.getIpv4Address()) ) {
-				// An existing address is being updated
+			} else if ( eRec.getIpv4Address() != null && dn.getIpv4Address() == null ) {
+				logger.log(Level.FINE, "An old ipv4 address is being removed");
 				sendUpdate = true;
-				update.setIpv4Address(dn.getIpv4Address());
+			} else if ( dn.getIpv4Address() != null && eRec.getIpv4Address() != null && !dn.getIpv4Address().getAddress().equals(eRec.getIpv4Address()) ) {
+				logger.log(Level.INFO, "Updating ipv4 address "+eRec.getIpv4Address().getHostAddress()+" -> "+dn.getIpv4Address().getAddress().getHostAddress());
+				sendUpdate = true;
 			}
 
-			if ( eRec.getIpv6Address() == null && dn.getIpv6Address() != null ||
-					eRec.getIpv6Address() != null && dn.getIpv6Address() == null) {
+			// IPv6
+			if ( eRec.getIpv6Address() == null && dn.getIpv6Address() != null ) {
+				logger.log(Level.FINE, "A new ipv6 address is being set "+dn.getIpv6Address().getAddress().getHostAddress());
 				sendUpdate = true;
-				update.setIpv6Address(dn.getIpv6Address());
-			} else if ( dn.getIpv6Address() != null && !dn.getIpv6Address().getAddress().equals(eRec.getIpv6Address()) ) {
+			} else if ( eRec.getIpv6Address() != null && dn.getIpv6Address() == null ) {
+				logger.log(Level.FINE, "An old ipv4 address is being removed");
 				sendUpdate = true;
-				update.setIpv6Address(dn.getIpv6Address());
+			} else if ( dn.getIpv6Address() != null && eRec.getIpv6Address() != null && !dn.getIpv6Address().getAddress().equals(eRec.getIpv6Address()) ) {
+				logger.log(Level.INFO, "Updating ipv6 address "+eRec.getIpv6Address().getHostAddress()+" -> "+dn.getIpv6Address().getAddress().getHostAddress());
+				sendUpdate = true;
 			}
-			System.out.println("Send Update: "+sendUpdate);
-			System.out.println(jsonParser.toJson(update));
+
+			if ( sendUpdate ) {
+				updateDNSRootRecord(dn.getDomainId(), update);
+			} else {
+				logger.log(Level.INFO, "No updates are required for the existing addresses");
+			}
 
 		} catch (IOException | InterruptedException | DynuClientException e) {
 			logger.log(Level.WARNING, "Exception:\n"+e.getMessage()+"\n"+getExceptionStack(e));
@@ -309,5 +408,6 @@ public class DynuClient {
 		} else {
 			maintainDynDomainName(dn);
 		}
+		logger.log(Level.INFO, "Completed checking on "+dn.getFullName());
 	}
 }

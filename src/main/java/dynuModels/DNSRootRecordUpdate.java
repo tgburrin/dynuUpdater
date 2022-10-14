@@ -14,8 +14,6 @@ public class DNSRootRecordUpdate {
 
 	public DNSRootRecordUpdate (String n) {
 		name = n;
-		ipv4 = false;
-		ipv6 = false;
 	}
 
 	public String getName() {
