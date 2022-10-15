@@ -3,11 +3,13 @@ package dynuUpdater;
 public class DynuDomainName {
 	private Long domainId;
 	private String domainName;
+	protected DomainNameUpdateStrategy updateStrategy;
 	private DomainAddress ipv4Address;
 	private DomainAddress ipv6Address;
 
 	public DynuDomainName (String domainName) {
 		this.domainName = domainName;
+		this.updateStrategy = new DomainRootUpdateStrategy();
 	}
 
 	public Long getDomainId() {
@@ -37,6 +39,10 @@ public class DynuDomainName {
 
 	public String getFullName() {
 		return this.domainName;
+	}
+
+	public void updateDomain(DynuClient cli) {
+		this.updateStrategy.updateDomainName(cli, this);
 	}
 
 	@Override

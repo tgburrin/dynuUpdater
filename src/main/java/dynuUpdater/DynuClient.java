@@ -239,7 +239,7 @@ public class DynuClient {
 				if ( da.getType() == currentAddress.getType() )
 					removeNameRecord(dn.getDomainId(), id);
 			}
-			logger.log(Level.FINER, "Adding address "+currentAddress.getAddress().getHostAddress());
+			logger.log(Level.INFO, "Adding address "+currentAddress.getAddress().getHostAddress());
 			DNSIdRecord resp = maintainDNSRecordForId(dn.getDomainId(), update);
 			rv = resp.getId();
 
@@ -256,7 +256,7 @@ public class DynuClient {
 						found = true;
 						rv = currentId;
 						if ( !da.equals(currentAddress) ) {
-							logger.log(Level.FINER, "Updating "+id+" "+da.getAddress().getHostAddress()+" -> "+currentAddress.getAddress().getHostAddress());
+							logger.log(Level.INFO, "Updating "+id+" "+da.getAddress().getHostAddress()+" -> "+currentAddress.getAddress().getHostAddress());
 							maintainDNSRecordForId(dn.getDomainId(), update);
 						} else {
 							logger.log(Level.FINER, "No update required for id "+id+" "+da.getAddress().getHostAddress());
@@ -268,7 +268,7 @@ public class DynuClient {
 				}
 			}
 			if ( !found ) {
-				logger.log(Level.FINER, "Sending update for id "+currentId+" "+currentAddress.getAddress().getHostAddress());
+				logger.log(Level.INFO, "Sending update for id "+currentId+" "+currentAddress.getAddress().getHostAddress());
 				DNSIdRecord resp = maintainDNSRecordForId(dn.getDomainId(), update);
 				rv = resp.getId();
 			} else {
@@ -279,7 +279,7 @@ public class DynuClient {
 		return rv;
 	}
 
-	private void maintainDynNodeName(DynuDomainNodeName dn) {
+	public void maintainDynDomainNameNode(DynuDomainNodeName dn) {
 		if ( dn.getDomainId() == null ) {
 			try {
 				DNSIdRecord dIdRec = getRootIdRecordByName(dn.getDomainName());
@@ -346,7 +346,7 @@ public class DynuClient {
 		}
 	}
 
-	private void maintainDynDomainName(DynuDomainName dn) {
+	public void maintainDynDomainNameRoot(DynuDomainName dn) {
 		try {
 			if ( dn.getDomainId() == null ) {
 				DNSIdRecord idRec = getRootIdRecordByName(dn.getDomainName());
@@ -393,21 +393,5 @@ public class DynuClient {
 		} catch (IOException | InterruptedException | DynuClientException e) {
 			logger.log(Level.WARNING, "Exception:\n"+e.getMessage()+"\n"+getExceptionStack(e));
 		}
-	}
-
-	public void maintainDomainName(DynuDomainName dn, ArrayList<DomainAddress> addrList) {
-		logger.log(Level.INFO, "Maintaining "+dn.getFullName());
-		for(DomainAddress da : addrList) {
-			if ( da.getType() == DNSRecordTypeEnum.IPV4 )
-				dn.setIpv4Address(da);
-			else if ( da.getType() == DNSRecordTypeEnum.IPV6 )
-				dn.setIpv6Address(da);
-		}
-		if ( dn instanceof DynuDomainNodeName ) {
-			maintainDynNodeName((DynuDomainNodeName) dn);
-		} else {
-			maintainDynDomainName(dn);
-		}
-		logger.log(Level.INFO, "Completed checking on "+dn.getFullName());
 	}
 }

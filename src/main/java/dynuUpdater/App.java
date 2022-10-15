@@ -56,6 +56,18 @@ public class App {
 		return rv;
 	}
 
+	private static void updateDomainNameController(DynuClient dc, DynuDomainName dn, ArrayList<DomainAddress> addrList) {
+		logger.log(Level.INFO, "Maintaining "+dn.getFullName());
+		for(DomainAddress da : addrList) {
+			if ( da.getType() == DNSRecordTypeEnum.IPV4 )
+				dn.setIpv4Address(da);
+			else if ( da.getType() == DNSRecordTypeEnum.IPV6 )
+				dn.setIpv6Address(da);
+		}
+		dn.updateDomain(dc);
+		logger.log(Level.INFO, "Completed checking on "+dn.getFullName());
+	}
+
     public static void main(String[] args) throws Exception {
         InputStream stream = App.class.getClassLoader()
                 .getResourceAsStream("logging.properties");
@@ -93,10 +105,8 @@ public class App {
 		do {
 			logger.info("Checking records...");
 			ArrayList<DomainAddress> addresses = getInterfaceAddresses(iface);
-			for(DynuDomainName dn : domainNames) {
-				dc.maintainDomainName(dn, addresses);
-			}
-			// dc.maintainRecords();
+			for(DynuDomainName dn : domainNames)
+				updateDomainNameController(dc, dn, addresses);
 			logger.info("Sleeping for "+ac.getPollPeriod()+"s...");
 			Thread.sleep(ac.getPollPeriod() * 1000);
 		} while ( true ); // run forever

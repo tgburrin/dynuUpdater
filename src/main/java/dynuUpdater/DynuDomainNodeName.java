@@ -8,6 +8,7 @@ public class DynuDomainNodeName extends DynuDomainName {
 	public DynuDomainNodeName(String domainName, String nodeName) {
 		super(domainName);
 		this.nodeName = nodeName;
+		this.updateStrategy = new DomainNodeUpdateStrategy();
 	}
 
 	public DynuDomainNodeName(DynuDomainName domain, String nodeName) {
@@ -42,6 +43,11 @@ public class DynuDomainNodeName extends DynuDomainName {
 	}
 
 	@Override
+	public void updateDomain(DynuClient cli) {
+		this.updateStrategy.updateDomainName(cli, this);
+	}
+
+	@Override
 	public String toString() {
 		return "DynuDomainName [\n"
 				+ " domainId=" + getDomainId()
@@ -53,4 +59,5 @@ public class DynuDomainNodeName extends DynuDomainName {
 				+ ",\n ipv6RecordId=" + ipv6RecordId
 				+ "\n]";
 	}
+
 }
